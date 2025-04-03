@@ -3,7 +3,7 @@ use core::f64::consts::PI;
 include!(concat!(env!("OUT_DIR"), "/cordic_tables.rs"));
 
 pub const fn sin(alpha: f64) -> f64 {
-    const N: usize = 53;
+    const N: usize = 63;
     let mut theta = 0.0;
     let mut x = 1.0;
     let mut y = 0.0;
