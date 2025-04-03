@@ -1,4 +1,11 @@
+/* embfft | lib.rs
+ * Copyright (c) 2025 L. Sartory
+ * SPDX-License-Identifier: MIT
+ */
+
 /* Decimation in frequency fast Fourier transform */
+
+/******************************************************************************/
 
 #![no_std]
 

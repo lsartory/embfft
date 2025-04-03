@@ -1,6 +1,17 @@
+/* embfft | cordic.rs
+ * Copyright (c) 2025 L. Sartory
+ * SPDX-License-Identifier: MIT
+ */
+
+/******************************************************************************/
+
 use core::f64::consts::PI;
 
+/******************************************************************************/
+
 include!(concat!(env!("OUT_DIR"), "/cordic_tables.rs"));
+
+/******************************************************************************/
 
 pub const fn sin(alpha: f64) -> f64 {
     const N: usize = 63;
@@ -22,4 +33,3 @@ pub const fn sin(alpha: f64) -> f64 {
 
     y * K_TABLE[N - 1]
 }
-

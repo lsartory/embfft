@@ -1,7 +1,16 @@
+/* embfft | build.rs
+ * Copyright (c) 2025 L. Sartory
+ * SPDX-License-Identifier: MIT
+ */
+
+/******************************************************************************/
+
 use std::env;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
+
+/******************************************************************************/
 
 fn compute_theta_table() -> [f64; 64] {
     (0..64)
@@ -19,6 +28,8 @@ fn compute_k_table() -> [f64; 64] {
         .try_into()
         .unwrap()
 }
+
+/******************************************************************************/
 
 fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
