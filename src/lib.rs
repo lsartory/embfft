@@ -8,7 +8,7 @@ mod cordic;
 
 /******************************************************************************/
 
-pub struct EmbFFT<'a, T, const N: usize> {
+pub struct EmbFft<'a, T, const N: usize> {
     data: &'a mut [(T, T); N],
     state: State,
     length: usize,
@@ -30,7 +30,7 @@ enum State {
     Done
 }
 
-impl<'a, T, const N: usize> EmbFFT<'a, T, N> {
+impl<'a, T, const N: usize> EmbFft<'a, T, N> {
     const LOG2_N: usize = {
         let mut x = N;
         let mut log2_n = 0;
@@ -232,7 +232,7 @@ macro_rules! gen_fft_iterate {
 
 /******************************************************************************/
 
-impl<'a, const N: usize> EmbFFT<'a, f32, N> {
+impl<'a, const N: usize> EmbFft<'a, f32, N> {
     const SINE_TABLE: [f32; N] = {
         gen_sine_table!(f32)
     };
@@ -248,7 +248,7 @@ impl<'a, const N: usize> EmbFFT<'a, f32, N> {
     }
 }
 
-impl<'a, const N: usize> EmbFFT<'a, f64, N> {
+impl<'a, const N: usize> EmbFft<'a, f64, N> {
     const SINE_TABLE: [f64; N] = {
         gen_sine_table!(f64)
     };
@@ -319,7 +319,7 @@ mod tests {
             ( -32.000000000, -324.901428223), ( -32.000000000, -651.374877930)
         ];
 
-        EmbFFT::new(&mut data).fft();
+        EmbFft::new(&mut data).fft();
 
         for (x, y) in core::iter::zip(data, expected_data) {
             assert_ulps_eq!(x.0, y.0);
@@ -375,7 +375,7 @@ mod tests {
             ( -32.000000000000000, -324.901452403483972), (-32.000000000000000, -651.374963999591046)
         ];
 
-        EmbFFT::new(&mut data).fft();
+        EmbFft::new(&mut data).fft();
 
         for (x, y) in core::iter::zip(data, expected_data) {
             assert_ulps_eq!(x.0, y.0);
