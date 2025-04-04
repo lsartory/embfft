@@ -55,6 +55,7 @@ impl<'a, T, const N: usize> EmbFft<'a, T, N> {
             i -= 1;
         }
         let is_n_pow2 = n == N;
+        assert!(N >= 4, "The FFT data buffer size must be 4 or greater");
         assert!(is_n_pow2, "The FFT data buffer size must be a power of 2");
         is_n_pow2
     };
@@ -80,6 +81,10 @@ impl<'a, T, const N: usize> EmbFft<'a, T, N> {
             top_ptr: 0,
             bottom_ptr: 0
         }
+    }
+
+    pub fn is_done(&self) -> bool {
+        self.state == State::Done
     }
 }
 
@@ -239,7 +244,7 @@ macro_rules! gen_fft_iterate {
 
 /******************************************************************************/
 
-impl<'a, const N: usize> EmbFft<'a, f32, N> {
+impl<const N: usize> EmbFft<'_, f32, N> {
     const SINE_TABLE: [f32; N] = {
         gen_sine_table!(f32)
     };
@@ -255,7 +260,7 @@ impl<'a, const N: usize> EmbFft<'a, f32, N> {
     }
 }
 
-impl<'a, const N: usize> EmbFft<'a, f64, N> {
+impl<const N: usize> EmbFft<'_, f64, N> {
     const SINE_TABLE: [f64; N] = {
         gen_sine_table!(f64)
     };
