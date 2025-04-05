@@ -3,6 +3,10 @@
  * SPDX-License-Identifier: MIT
  */
 
+//! CORDIC functions
+//!
+//! Useful for precomputing trigonometry tables
+
 /******************************************************************************/
 
 use core::f64::consts::PI;
@@ -13,6 +17,9 @@ include!(concat!(env!("OUT_DIR"), "/cordic_tables.rs"));
 
 /******************************************************************************/
 
+/// Compute the sine of an angle
+///
+/// The angle in radians must be comprised between -π/2 and +π/2
 pub const fn sin(alpha: f64) -> f64 {
     const N: usize = 63;
     let mut theta = 0.0;

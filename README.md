@@ -1,7 +1,7 @@
 # EmbFft
 
-EmbFft is an easy to use FFT library primarily meant for embedded systems.
-It is based on a state machine that allows performing other tasks between iterations, without having to rely on multi-threading or async functions.
+EmbFft is an easy to use Fast Fourier Transform library primarily meant for embedded systems.
+It is based on a state machine that allows other tasks to be performed between iterations, without having to rely on multi-threading or async functions.
 
 ## Features
 
@@ -17,15 +17,15 @@ The library offers the following features:
 
 ## Limitations
 
-Because of the algorithm used, the following limitations exist:
-* ROM space is required to hold the precomputed sine tables
-* Buffers must have a power of 2 size
+Because of the FFT algorithm used, the following limitations exist:
+* ROM space is required to store pre-computed sine tables
+* Buffers must be a power of 2 in size
 * Inverse FFT is not implemented yet
 
 ## Examples
 
 ### Non-blocking
-```Rust
+```rust
 let mut data = [
     (1.0f32, 1.0), (2.0, 2.0),
     (3.0f32, 3.0), (4.0, 4.0),
@@ -45,7 +45,7 @@ for x in data {
 ```
 
 ### Blocking
-```Rust
+```rust
 let mut data = [
     (1.0f32, 1.0), (2.0, 2.0),
     (3.0f32, 3.0), (4.0, 4.0),

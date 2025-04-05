@@ -8,6 +8,8 @@
 /******************************************************************************/
 
 #![no_std]
+#![doc = include_str!("../README.md")]
+#[warn(missing_docs)]
 
 /******************************************************************************/
 
@@ -15,6 +17,10 @@ mod cordic;
 
 /******************************************************************************/
 
+/// The main EmbFft structure
+///
+/// It contains a reference to the input / output data, as well as information related to the
+/// internal state.
 pub struct EmbFft<'a, T, const N: usize> {
     data: &'a mut [(T, T); N],
     state: State,
@@ -25,6 +31,7 @@ pub struct EmbFft<'a, T, const N: usize> {
     bottom_ptr: usize
 }
 
+/// Conversion state
 #[derive(PartialEq)]
 enum State {
     Step1,
@@ -38,6 +45,7 @@ enum State {
 }
 
 impl<'a, T, const N: usize> EmbFft<'a, T, N> {
+    /// Base 2 logarithm of the FFT size
     const LOG2_N: usize = {
         let mut x = N;
         let mut log2_n = 0;
@@ -60,6 +68,10 @@ impl<'a, T, const N: usize> EmbFft<'a, T, N> {
         is_n_pow2
     };
 
+    /// Reverse all the bits in an integer
+    ///
+    /// Example: 0b11010010 --> 0b01001011
+    /// Useful for sorting the output FFT values by frequency.
     const fn reverse_bits(x: usize) -> usize {
         let mut i = 0;
         let mut ret = 0;
@@ -70,6 +82,9 @@ impl<'a, T, const N: usize> EmbFft<'a, T, N> {
         ret
     }
 
+    /// Initializes a new FFT conversion
+    ///
+    /// Use this function whenever a new conversion is required.
     pub fn new(data: &'a mut [(T, T); N]) -> Self {
         assert!(Self::IS_N_POW2);
         Self {
@@ -83,6 +98,9 @@ impl<'a, T, const N: usize> EmbFft<'a, T, N> {
         }
     }
 
+    /// Checks if the conversion is complete
+    ///
+    /// Use this together with the [`EmbFft::fft_iterate()`] function.
     pub fn is_done(&self) -> bool {
         self.state == State::Done
     }
@@ -249,10 +267,40 @@ impl<const N: usize> EmbFft<'_, f32, N> {
         gen_sine_table!(f32)
     };
 
+    /// Non-blocking FFT computation with f32 precision
+    ///
+    /// Use this together with the [`EmbFft::is_done()`] function.
+    /// For example:
+    /// ```
+    /// let mut data = [
+    ///     (1.0f32, 1.0), (2.0, 2.0),
+    ///     (3.0f32, 3.0), (4.0, 4.0),
+    ///     (5.0f32, 5.0), (6.0, 6.0),
+    ///     (7.0f32, 7.0), (8.0, 8.0)
+    /// ];
+    /// 
+    /// let mut fft = embfft::EmbFft::new(&mut data);
+    /// while !fft.is_done() {
+    ///     fft.fft_iterate();
+    ///     // Other actions can be performed here between two iterations
+    /// }
+    /// ```
     pub fn fft_iterate(&mut self) {
         gen_fft_iterate!(self);
     }
 
+    /// Blocking FFT computation with f32 precision
+    ///
+    /// For example:
+    /// ```
+    /// let mut data = [
+    ///     (1.0f32, 1.0), (2.0, 2.0),
+    ///     (3.0f32, 3.0), (4.0, 4.0),
+    ///     (5.0f32, 5.0), (6.0, 6.0),
+    ///     (7.0f32, 7.0), (8.0, 8.0)
+    /// ];
+    /// embfft::EmbFft::new(&mut data).fft();
+    /// ```
     pub fn fft(&mut self) {
         while self.state != State::Done {
             gen_fft_iterate!(self);
@@ -265,10 +313,40 @@ impl<const N: usize> EmbFft<'_, f64, N> {
         gen_sine_table!(f64)
     };
 
+    /// Non-blocking FFT computation with f64 precision
+    ///
+    /// Use this together with the [`EmbFft::is_done()`] function.
+    /// For example:
+    /// ```
+    /// let mut data = [
+    ///     (1.0f64, 1.0), (2.0, 2.0),
+    ///     (3.0f64, 3.0), (4.0, 4.0),
+    ///     (5.0f64, 5.0), (6.0, 6.0),
+    ///     (7.0f64, 7.0), (8.0, 8.0)
+    /// ];
+    /// 
+    /// let mut fft = embfft::EmbFft::new(&mut data);
+    /// while !fft.is_done() {
+    ///     fft.fft_iterate();
+    ///     // Other actions can be performed here between two iterations
+    /// }
+    /// ```
     pub fn fft_iterate(&mut self) {
         gen_fft_iterate!(self);
     }
 
+    /// Blocking FFT computation with f64 precision
+    ///
+    /// For example:
+    /// ```
+    /// let mut data = [
+    ///     (1.0f64, 1.0), (2.0, 2.0),
+    ///     (3.0f64, 3.0), (4.0, 4.0),
+    ///     (5.0f64, 5.0), (6.0, 6.0),
+    ///     (7.0f64, 7.0), (8.0, 8.0)
+    /// ];
+    /// embfft::EmbFft::new(&mut data).fft();
+    /// ```
     pub fn fft(&mut self) {
         while self.state != State::Done {
             gen_fft_iterate!(self);
