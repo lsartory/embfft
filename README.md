@@ -22,23 +22,40 @@ Because of the algorithm used, the following limitations exist:
 * Buffers must have a power of 2 size
 * Inverse FFT is not implemented yet
 
-## Example
+## Examples
 
+### Non-blocking
 ```Rust
-    let mut data = [
-        (1.0f32, 1.0), (2.0f32, 2.0),
-        (3.0f32, 3.0), (4.0f32, 4.0),
-        (5.0f32, 5.0), (6.0f32, 6.0),
-        (7.0f32, 7.0), (8.0f32, 8.0)
-    ];
+let mut data = [
+    (1.0f32, 1.0), (2.0, 2.0),
+    (3.0f32, 3.0), (4.0, 4.0),
+    (5.0f32, 5.0), (6.0, 6.0),
+    (7.0f32, 7.0), (8.0, 8.0)
+];
 
-    let mut fft = embfft::EmbFft::new(&mut data);
-    while !fft.is_done() {
-        fft.fft_iterate();
-        // Other actions can be performed here between two iterations
-    }
+let mut fft = embfft::EmbFft::new(&mut data);
+while !fft.is_done() {
+    fft.fft_iterate();
+    // Other actions can be performed here between two iterations
+}
 
-    for x in data {
-        println!("{:?}", x);
-    }
+for x in data {
+    println!("{:?}", x);
+}
+```
+
+### Blocking
+```Rust
+let mut data = [
+    (1.0f32, 1.0), (2.0, 2.0),
+    (3.0f32, 3.0), (4.0, 4.0),
+    (5.0f32, 5.0), (6.0, 6.0),
+    (7.0f32, 7.0), (8.0, 8.0)
+];
+
+embfft::EmbFft::new(&mut data).fft();
+
+for x in data {
+    println!("{:?}", x);
+}
 ```
