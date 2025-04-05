@@ -3,5 +3,12 @@ name = "embfft"
 version = "0.1.0"
 edition = "2021"
 
+description = "Non-blocking FFT for embedded systems"
+repository = "https://github.com/lsartory/embfft"
+keywords = [ "fft", "embedded", "fourier", "transform", "no_std" ]
+categories = [ "algorithms", "embedded", "no-std::no-alloc", "science" ]
+readme = "README.md"
+license = "MIT"
+
 [dev-dependencies]
 approx = "0.5.1"
