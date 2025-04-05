@@ -23,7 +23,10 @@ fn compute_theta_table() -> [f64; 64] {
 fn compute_k_table() -> [f64; 64] {
     let mut k = 1.0;
     (0..64)
-        .map(|i| { k *= 1.0 / f64::sqrt(1.0 + f64::powf(2.0, -2.0 * i as f64)); k })
+        .map(|i| {
+            k *= 1.0 / f64::sqrt(1.0 + f64::powf(2.0, -2.0 * i as f64));
+            k
+        })
         .collect::<Vec<f64>>()
         .try_into()
         .unwrap()
@@ -38,7 +41,19 @@ fn main() {
 
     let theta_table = compute_theta_table();
     writeln!(&mut f, "#[allow(clippy::approx_constant)]").unwrap();
-    writeln!(&mut f, "const THETA_TABLE: [f64; {}] = {:?};", theta_table.len(), theta_table).unwrap();
+    writeln!(
+        &mut f,
+        "const THETA_TABLE: [f64; {}] = {:?};",
+        theta_table.len(),
+        theta_table
+    )
+    .unwrap();
     let k_table = compute_k_table();
-    writeln!(&mut f, "const K_TABLE: [f64; {}] = {:?};", k_table.len(), k_table).unwrap();
+    writeln!(
+        &mut f,
+        "const K_TABLE: [f64; {}] = {:?};",
+        k_table.len(),
+        k_table
+    )
+    .unwrap();
 }

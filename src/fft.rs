@@ -66,147 +66,144 @@ impl<'a, T, const N: usize> EmbFft<'a, T, N> {
 /******************************************************************************/
 
 macro_rules! gen_fft_iterate {
-    ($self: ident) => {
-        {
-            let top;
-            let bottom;
+    ($self: ident, $T: ty, $N: expr) => {{
+        let sine_table = &SineTable::<$T, $N>::SINE_TABLE;
+        let top;
+        let bottom;
 
-            match $self.state {
-                State::Step1 => {
-                    // Twiddle = 1
-                    $self.bottom_ptr = $self.top_ptr + ($self.length << 1);
-                    top = $self.data[$self.top_ptr];
-                    bottom = $self.data[$self.bottom_ptr];
-                    $self.data[$self.top_ptr].0 = 1.0 * bottom.0 + top.0;
-                    $self.data[$self.top_ptr].1 = 1.0 * bottom.1 + top.1;
-                    $self.data[$self.bottom_ptr].0 = -1.0 * bottom.0 + top.0;
-                    $self.data[$self.bottom_ptr].1 = -1.0 * bottom.1 + top.1;
+        match $self.state {
+            State::Step1 => {
+                // Twiddle = 1
+                $self.bottom_ptr = $self.top_ptr + ($self.length << 1);
+                top = $self.data[$self.top_ptr];
+                bottom = $self.data[$self.bottom_ptr];
+                $self.data[$self.top_ptr].0 = 1.0 * bottom.0 + top.0;
+                $self.data[$self.top_ptr].1 = 1.0 * bottom.1 + top.1;
+                $self.data[$self.bottom_ptr].0 = -1.0 * bottom.0 + top.0;
+                $self.data[$self.bottom_ptr].1 = -1.0 * bottom.1 + top.1;
+                $self.top_ptr += 1;
+                $self.bottom_ptr += 1;
+                $self.step = $self.step_size;
+                if $self.step_size < N / 4 {
+                    $self.state = State::Step2;
+                } else {
+                    $self.state = State::Step3;
+                }
+            },
+
+            State::Step2 => {
+                // Twiddle = e^(-j * theta)
+                top = $self.data[$self.top_ptr];
+                bottom = $self.data[$self.bottom_ptr];
+                let temp = (-1.0 * bottom.0 + top.0, -1.0 * bottom.1 + top.1);
+                $self.data[$self.top_ptr].0 = 1.0 * bottom.0 + top.0;
+                $self.data[$self.top_ptr].1 = 1.0 * bottom.1 + top.1;
+                $self.data[$self.bottom_ptr].0 = temp.0 * sine_table[N / 4 - $self.step] + temp.1 * sine_table[$self.step];
+                $self.data[$self.bottom_ptr].1 = temp.1 * sine_table[N / 4 - $self.step] - temp.0 * sine_table[$self.step];
+                $self.top_ptr += 1;
+                $self.bottom_ptr += 1;
+                if $self.step < N / 4 - $self.step_size {
+                    $self.step += $self.step_size;
+                } else {
+                    $self.state = State::Step3;
+                }
+            },
+
+            State::Step3 => {
+                // Twiddle = -j
+                top = $self.data[$self.top_ptr];
+                bottom = $self.data[$self.bottom_ptr];
+                $self.data[$self.top_ptr].0 = 1.0 * bottom.0 + top.0;
+                $self.data[$self.top_ptr].1 = 1.0 * bottom.1 + top.1;
+                $self.data[$self.bottom_ptr].0 = -1.0 * bottom.1 + top.1;
+                $self.data[$self.bottom_ptr].1 = -1.0 * top.0 + bottom.0;
+                $self.top_ptr += 1;
+                $self.bottom_ptr += 1;
+                $self.step = $self.step_size;
+                if $self.step_size < N / 4 {
+                    $self.state = State::Step4;
+                } else {
+                    $self.state = State::Step5;
+                }
+            },
+
+            State::Step4 => {
+                // Twiddle = -j * e^(-j * theta)
+                top = $self.data[$self.top_ptr];
+                bottom = $self.data[$self.bottom_ptr];
+                let temp = (-1.0 * bottom.1 + top.1, -1.0 * top.0 + bottom.0);
+                $self.data[$self.top_ptr].0 = 1.0 * bottom.0 + top.0;
+                $self.data[$self.top_ptr].1 = 1.0 * bottom.1 + top.1;
+                $self.data[$self.bottom_ptr].0 = temp.0 * sine_table[N / 4 - $self.step] + temp.1 * sine_table[$self.step];
+                $self.data[$self.bottom_ptr].1 = temp.1 * sine_table[N / 4 - $self.step] - temp.0 * sine_table[$self.step];
+                $self.top_ptr += 1;
+                $self.bottom_ptr += 1;
+                if $self.step < N / 4 - $self.step_size {
+                    $self.step += $self.step_size;
+                } else {
+                    $self.state = State::Step5;
+                }
+            },
+
+            State::Step5 => {
+                // Check if we need to loop
+                if $self.bottom_ptr < N {
+                    $self.top_ptr = $self.bottom_ptr;
+                    $self.state = State::Step1;
+                } else if $self.length > 1 {
+                    $self.length >>= 1;
+                    $self.step_size <<= 1;
+                    $self.top_ptr = 0;
+                    $self.state = State::Step1;
+                } else {
+                    $self.top_ptr = 0;
+                    $self.bottom_ptr = 1;
+                    $self.state = State::Step6;
+                }
+            },
+
+            State::Step6 => {
+                // Twiddle = 1
+                top = $self.data[$self.top_ptr];
+                bottom = $self.data[$self.bottom_ptr];
+                $self.data[$self.top_ptr].0 = 1.0 * bottom.0 + top.0;
+                $self.data[$self.top_ptr].1 = 1.0 * bottom.1 + top.1;
+                $self.data[$self.bottom_ptr].0 = -1.0 * bottom.0 + top.0;
+                $self.data[$self.bottom_ptr].1 = -1.0 * bottom.1 + top.1;
+                if $self.bottom_ptr < N - 2 {
+                    $self.top_ptr += 2;
+                    $self.bottom_ptr += 2;
+                } else {
+                    $self.top_ptr = 0;
+                    $self.bottom_ptr = 0;
+                    $self.state = State::Reorder;
+                }
+            },
+
+            State::Reorder => {
+                // Ensure the output order is the same as the input
+                top = $self.data[$self.top_ptr];
+                bottom = $self.data[$self.bottom_ptr];
+                if $self.bottom_ptr > $self.top_ptr {
+                    $self.data[$self.top_ptr] = bottom;
+                    $self.data[$self.bottom_ptr] = top;
+                }
+                if $self.top_ptr < N - 1 {
+                    $self.bottom_ptr = Base::<N>::reverse_bits($self.top_ptr + 1);
                     $self.top_ptr += 1;
-                    $self.bottom_ptr += 1;
-                    $self.step = $self.step_size;
-                    if $self.step_size < N / 4 {
-                        $self.state = State::Step2;
-                    } else {
-                        $self.state = State::Step3;
-                    }
-                },
+                } else {
+                    $self.state = State::Done;
+                }
+            },
 
-                State::Step2 => {
-                    // Twiddle = e^(-j * theta)
-                    top = $self.data[$self.top_ptr];
-                    bottom = $self.data[$self.bottom_ptr];
-                    let temp = (-1.0 * bottom.0 + top.0, -1.0 * bottom.1 + top.1);
-                    $self.data[$self.top_ptr].0 = 1.0 * bottom.0 + top.0;
-                    $self.data[$self.top_ptr].1 = 1.0 * bottom.1 + top.1;
-                    $self.data[$self.bottom_ptr].0 = temp.0 * Self::SINE_TABLE[N / 4 - $self.step] + temp.1 * Self::SINE_TABLE[$self.step];
-                    $self.data[$self.bottom_ptr].1 = temp.1 * Self::SINE_TABLE[N / 4 - $self.step] - temp.0 * Self::SINE_TABLE[$self.step];
-                    $self.top_ptr += 1;
-                    $self.bottom_ptr += 1;
-                    if $self.step < N / 4 - $self.step_size {
-                        $self.step += $self.step_size;
-                    } else {
-                        $self.state = State::Step3;
-                    }
-                },
-
-                State::Step3 => {
-                    // Twiddle = -j
-                    top = $self.data[$self.top_ptr];
-                    bottom = $self.data[$self.bottom_ptr];
-                    $self.data[$self.top_ptr].0 = 1.0 * bottom.0 + top.0;
-                    $self.data[$self.top_ptr].1 = 1.0 * bottom.1 + top.1;
-                    $self.data[$self.bottom_ptr].0 = -1.0 * bottom.1 + top.1;
-                    $self.data[$self.bottom_ptr].1 = -1.0 * top.0 + bottom.0;
-                    $self.top_ptr += 1;
-                    $self.bottom_ptr += 1;
-                    $self.step = $self.step_size;
-                    if $self.step_size < N / 4 {
-                        $self.state = State::Step4;
-                    } else {
-                        $self.state = State::Step5;
-                    }
-                },
-
-                State::Step4 => {
-                    // Twiddle = -j * e^(-j * theta)
-                    top = $self.data[$self.top_ptr];
-                    bottom = $self.data[$self.bottom_ptr];
-                    let temp = (-1.0 * bottom.1 + top.1, -1.0 * top.0 + bottom.0);
-                    $self.data[$self.top_ptr].0 = 1.0 * bottom.0 + top.0;
-                    $self.data[$self.top_ptr].1 = 1.0 * bottom.1 + top.1;
-                    $self.data[$self.bottom_ptr].0 = temp.0 * Self::SINE_TABLE[N / 4 - $self.step] + temp.1 * Self::SINE_TABLE[$self.step];
-                    $self.data[$self.bottom_ptr].1 = temp.1 * Self::SINE_TABLE[N / 4 - $self.step] - temp.0 * Self::SINE_TABLE[$self.step];
-                    $self.top_ptr += 1;
-                    $self.bottom_ptr += 1;
-                    if $self.step < N / 4 - $self.step_size {
-                        $self.step += $self.step_size;
-                    } else {
-                        $self.state = State::Step5;
-                    }
-                },
-
-                State::Step5 => {
-                    // Check if we need to loop
-                    if $self.bottom_ptr < N {
-                        $self.top_ptr = $self.bottom_ptr;
-                        $self.state = State::Step1;
-                    } else if $self.length > 1 {
-                        $self.length >>= 1;
-                        $self.step_size <<= 1;
-                        $self.top_ptr = 0;
-                        $self.state = State::Step1;
-                    } else {
-                        $self.top_ptr = 0;
-                        $self.bottom_ptr = 1;
-                        $self.state = State::Step6;
-                    }
-                },
-
-                State::Step6 => {
-                    // Twiddle = 1
-                    top = $self.data[$self.top_ptr];
-                    bottom = $self.data[$self.bottom_ptr];
-                    $self.data[$self.top_ptr].0 = 1.0 * bottom.0 + top.0;
-                    $self.data[$self.top_ptr].1 = 1.0 * bottom.1 + top.1;
-                    $self.data[$self.bottom_ptr].0 = -1.0 * bottom.0 + top.0;
-                    $self.data[$self.bottom_ptr].1 = -1.0 * bottom.1 + top.1;
-                    if $self.bottom_ptr < N - 2 {
-                        $self.top_ptr += 2;
-                        $self.bottom_ptr += 2;
-                    } else {
-                        $self.top_ptr = 0;
-                        $self.bottom_ptr = 0;
-                        $self.state = State::Reorder;
-                    }
-                },
-
-                State::Reorder => {
-                    // Ensure the output order is the same as the input
-                    top = $self.data[$self.top_ptr];
-                    bottom = $self.data[$self.bottom_ptr];
-                    if $self.bottom_ptr > $self.top_ptr {
-                        $self.data[$self.top_ptr] = bottom;
-                        $self.data[$self.bottom_ptr] = top;
-                    }
-                    if $self.top_ptr < N - 1 {
-                        $self.bottom_ptr = Base::<N>::reverse_bits($self.top_ptr + 1);
-                        $self.top_ptr += 1;
-                    } else {
-                        $self.state = State::Done;
-                    }
-                },
-
-                State::Done => {}
-            }
+            State::Done => {}
         }
-    }
+    }};
 }
 
 /******************************************************************************/
 
 impl<const N: usize> EmbFft<'_, f32, N> {
-    const SINE_TABLE: [f32; N] = SineTable::<f32, N>::SINE_TABLE;
-
     /// Non-blocking FFT computation with f32 precision
     ///
     /// Use this together with the [`EmbFft::is_done()`] function.
@@ -218,7 +215,7 @@ impl<const N: usize> EmbFft<'_, f32, N> {
     ///     (5.0f32, 5.0), (6.0, 6.0),
     ///     (7.0f32, 7.0), (8.0, 8.0)
     /// ];
-    /// 
+    ///
     /// let mut fft = embfft::EmbFft::new(&mut data);
     /// while !fft.is_done() {
     ///     fft.fft_iterate();
@@ -226,7 +223,7 @@ impl<const N: usize> EmbFft<'_, f32, N> {
     /// }
     /// ```
     pub fn fft_iterate(&mut self) {
-        gen_fft_iterate!(self);
+        gen_fft_iterate!(self, f32, N);
     }
 
     /// Blocking FFT computation with f32 precision
@@ -243,14 +240,12 @@ impl<const N: usize> EmbFft<'_, f32, N> {
     /// ```
     pub fn fft(&mut self) {
         while self.state != State::Done {
-            gen_fft_iterate!(self);
+            gen_fft_iterate!(self, f32, N);
         }
     }
 }
 
 impl<const N: usize> EmbFft<'_, f64, N> {
-    const SINE_TABLE: [f64; N] = SineTable::<f64, N>::SINE_TABLE;
-
     /// Non-blocking FFT computation with f64 precision
     ///
     /// Use this together with the [`EmbFft::is_done()`] function.
@@ -262,7 +257,7 @@ impl<const N: usize> EmbFft<'_, f64, N> {
     ///     (5.0f64, 5.0), (6.0, 6.0),
     ///     (7.0f64, 7.0), (8.0, 8.0)
     /// ];
-    /// 
+    ///
     /// let mut fft = embfft::EmbFft::new(&mut data);
     /// while !fft.is_done() {
     ///     fft.fft_iterate();
@@ -270,7 +265,7 @@ impl<const N: usize> EmbFft<'_, f64, N> {
     /// }
     /// ```
     pub fn fft_iterate(&mut self) {
-        gen_fft_iterate!(self);
+        gen_fft_iterate!(self, f64, N);
     }
 
     /// Blocking FFT computation with f64 precision
@@ -287,7 +282,7 @@ impl<const N: usize> EmbFft<'_, f64, N> {
     /// ```
     pub fn fft(&mut self) {
         while self.state != State::Done {
-            gen_fft_iterate!(self);
+            gen_fft_iterate!(self, f64, N);
         }
     }
 }

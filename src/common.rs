@@ -51,28 +51,23 @@ impl<const N: usize> Base<N> {
 pub struct SineTable<T, const N: usize>(T);
 
 macro_rules! gen_sine_table {
-    ($type: ty) => {
-        {
-            // TODO: the size should be N / 4...
-            let mut table = [0.0; N];
-            let mut i = 1;
-            while i < N / 4 {
-                table[i] = crate::cordic::sin(2.0 * core::f64::consts::PI * i as f64 / N as f64) as $type;
-                i += 1;
-            }
-            table
+    ($type: ty) => {{
+        // TODO: the size should be N / 4...
+        let mut table = [0.0; N];
+        let mut i = 1;
+        while i < N / 4 {
+            table[i] =
+                crate::cordic::sin(2.0 * core::f64::consts::PI * i as f64 / N as f64) as $type;
+            i += 1;
         }
-    }
+        table
+    }};
 }
 
 impl<const N: usize> SineTable<f32, N> {
-    pub const SINE_TABLE: [f32; N] = {
-        gen_sine_table!(f32)
-    };
+    pub const SINE_TABLE: [f32; N] = { gen_sine_table!(f32) };
 }
 
 impl<const N: usize> SineTable<f64, N> {
-    pub const SINE_TABLE: [f64; N] = {
-        gen_sine_table!(f64)
-    };
+    pub const SINE_TABLE: [f64; N] = { gen_sine_table!(f64) };
 }
