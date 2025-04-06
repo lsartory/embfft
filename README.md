@@ -3,6 +3,7 @@
 EmbFft is an easy to use Fast Fourier Transform library primarily meant for embedded systems.
 It is based on a state machine that allows other tasks to be performed between iterations, without having to rely on multi-threading or async functions.
 
+
 ## Features
 
 The library offers the following features:
@@ -15,12 +16,13 @@ The library offers the following features:
 * Supports any buffer size greater than 4, as long as it is a power of two
 * Allows single-precision (f32) as well as double-precision (f64) conversions
 
+
 ## Limitations
 
 Because of the FFT algorithm used, the following limitations exist:
 * ROM space is required to store pre-computed sine tables
 * Buffers must be a power of 2 in size
-* Inverse FFT is not implemented yet
+
 
 ## Examples
 
@@ -59,3 +61,16 @@ for x in data {
     println!("{:?}", x);
 }
 ```
+
+
+## Acknowledgement
+
+Thanks to Robert Bristow-Johnson for the explanation of the algorithm, as well as for the example implementation.
+
+
+## Changelog
+
+| Date       | Version | Changes         |
+|------------|---------|-----------------|
+| 2025-04-05 | 0.1.0   | Initial release |
+| 2025-04-?? | 0.2.0   | Add IFFT        |
