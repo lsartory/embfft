@@ -73,4 +73,4 @@ Thanks to Robert Bristow-Johnson for the explanation of the algorithm, as well a
 | Date       | Version | Changes         |
 |------------|---------|-----------------|
 | 2025-04-05 | 0.1.0   | Initial release |
-| 2025-04-?? | 0.2.0   | Add IFFT        |
+| 2025-04-06 | 0.2.0   | Add IFFT        |
