@@ -5,7 +5,7 @@
 
 /******************************************************************************/
 
-use crate::common::{Base, SineTable};
+use crate::common::{Base, Float};
 
 /******************************************************************************/
 
@@ -36,7 +36,7 @@ enum State {
     Done
 }
 
-impl<'a, T, const N: usize> EmbFft<'a, T, N> {
+impl<'a, T: Float<N>, const N: usize> EmbFft<'a, T, N> {
     /// Initializes a new FFT conversion
     ///
     /// Use this function whenever a new conversion is required.
@@ -53,235 +53,184 @@ impl<'a, T, const N: usize> EmbFft<'a, T, N> {
         }
     }
 
+    fn step1(&mut self) {
+        // Twiddle = 1
+        self.bottom_idx = self.top_idx + (self.length << 1);
+        let top = self.data[self.top_idx];
+        let bottom = self.data[self.bottom_idx];
+        self.data[self.top_idx].0 = bottom.0 + top.0;
+        self.data[self.top_idx].1 = bottom.1 + top.1;
+        self.data[self.bottom_idx].0 = top.0 - bottom.0;
+        self.data[self.bottom_idx].1 = top.1 - bottom.1;
+        self.top_idx += 1;
+        self.bottom_idx += 1;
+        self.step = self.step_size;
+        if self.step_size < N / 4 {
+            self.state = State::Step2;
+        } else {
+            self.state = State::Step3;
+        }
+    }
+
+    fn step2(&mut self) {
+        // Twiddle = e^(-j * theta)
+        let top = self.data[self.top_idx];
+        let bottom = self.data[self.bottom_idx];
+        let temp = (top.0 - bottom.0, top.1 - bottom.1);
+        self.data[self.top_idx].0 = bottom.0 + top.0;
+        self.data[self.top_idx].1 = bottom.1 + top.1;
+        self.data[self.bottom_idx].0 = temp.0 * T::SINE_TABLE[N / 4 - self.step] + temp.1 * T::SINE_TABLE[self.step];
+        self.data[self.bottom_idx].1 = temp.1 * T::SINE_TABLE[N / 4 - self.step] - temp.0 * T::SINE_TABLE[self.step];
+        self.top_idx += 1;
+        self.bottom_idx += 1;
+        if self.step < N / 4 - self.step_size {
+            self.step += self.step_size;
+        } else {
+            self.state = State::Step3;
+        }
+    }
+
+    fn step3(&mut self) {
+        // Twiddle = -j
+        let top = self.data[self.top_idx];
+        let bottom = self.data[self.bottom_idx];
+        self.data[self.top_idx].0 = bottom.0 + top.0;
+        self.data[self.top_idx].1 = bottom.1 + top.1;
+        self.data[self.bottom_idx].0 = top.1 - bottom.1;
+        self.data[self.bottom_idx].1 = bottom.0 - top.0;
+        self.top_idx += 1;
+        self.bottom_idx += 1;
+        self.step = self.step_size;
+        if self.step_size < N / 4 {
+            self.state = State::Step4;
+        } else {
+            self.state = State::Step5;
+        }
+    }
+
+    fn step4(&mut self) {
+        // Twiddle = -j * e^(-j * theta)
+        let top = self.data[self.top_idx];
+        let bottom = self.data[self.bottom_idx];
+        let temp = (top.1 - bottom.1, bottom.0 - top.0);
+        self.data[self.top_idx].0 = bottom.0 + top.0;
+        self.data[self.top_idx].1 = bottom.1 + top.1;
+        self.data[self.bottom_idx].0 = temp.0 * T::SINE_TABLE[N / 4 - self.step] + temp.1 * T::SINE_TABLE[self.step];
+        self.data[self.bottom_idx].1 = temp.1 * T::SINE_TABLE[N / 4 - self.step] - temp.0 * T::SINE_TABLE[self.step];
+        self.top_idx += 1;
+        self.bottom_idx += 1;
+        if self.step < N / 4 - self.step_size {
+            self.step += self.step_size;
+        } else {
+            self.state = State::Step5;
+        }
+    }
+
+    fn step5(&mut self) {
+        // Check if we need to loop
+        if self.bottom_idx < N {
+            self.top_idx = self.bottom_idx;
+            self.state = State::Step1;
+        } else if self.length > 1 {
+            self.length >>= 1;
+            self.step_size <<= 1;
+            self.top_idx = 0;
+            self.state = State::Step1;
+        } else {
+            self.top_idx = 0;
+            self.bottom_idx = 1;
+            self.state = State::Step6;
+        }
+    }
+
+    fn step6(&mut self) {
+        // Twiddle = 1
+        let top = self.data[self.top_idx];
+        let bottom = self.data[self.bottom_idx];
+        self.data[self.top_idx].0 = bottom.0 + top.0;
+        self.data[self.top_idx].1 = bottom.1 + top.1;
+        self.data[self.bottom_idx].0 = top.0 - bottom.0;
+        self.data[self.bottom_idx].1 = top.1 - bottom.1;
+        if self.bottom_idx < N - 2 {
+            self.top_idx += 2;
+            self.bottom_idx += 2;
+        } else {
+            self.top_idx = 0;
+            self.bottom_idx = 0;
+            self.state = State::Reorder;
+        }
+    }
+
+    fn reorder(&mut self) {
+        // Ensure the output order is the same as the input
+        let top = self.data[self.top_idx];
+        let bottom = self.data[self.bottom_idx];
+        if self.bottom_idx > self.top_idx {
+            self.data[self.top_idx] = bottom;
+            self.data[self.bottom_idx] = top;
+        }
+        if self.top_idx < N - 1 {
+            self.bottom_idx = Base::<N>::reverse_bits(self.top_idx + 1);
+            self.top_idx += 1;
+        } else {
+            self.state = State::Done;
+        }
+    }
+
+    /// Non-blocking FFT computation
+    ///
+    /// Use this together with the [`EmbFft::is_done()`] function.
+    /// For example:
+    /// ```
+    /// let mut data = [
+    ///     (1.0f32, 1.0), (2.0, 2.0),
+    ///     (3.0f32, 3.0), (4.0, 4.0),
+    ///     (5.0f32, 5.0), (6.0, 6.0),
+    ///     (7.0f32, 7.0), (8.0, 8.0)
+    /// ];
+    ///
+    /// let mut fft = embfft::EmbFft::new(&mut data);
+    /// while !fft.is_done() {
+    ///     fft.fft_iterate();
+    ///     // Other actions can be performed here between two iterations
+    /// }
+    /// ```
+    pub fn fft_iterate(&mut self) {
+        match self.state {
+            State::Step1 => { self.step1(); },
+            State::Step2 => { self.step2(); },
+            State::Step3 => { self.step3(); },
+            State::Step4 => { self.step4(); },
+            State::Step5 => { self.step5(); },
+            State::Step6 => { self.step6(); },
+            State::Reorder => { self.reorder(); },
+            State::Done => {}
+        }
+    }
+
+    /// Blocking FFT computation
+    ///
+    /// For example:
+    /// ```
+    /// let mut data = [
+    ///     (1.0f32, 1.0), (2.0, 2.0),
+    ///     (3.0f32, 3.0), (4.0, 4.0),
+    ///     (5.0f32, 5.0), (6.0, 6.0),
+    ///     (7.0f32, 7.0), (8.0, 8.0)
+    /// ];
+    /// embfft::EmbFft::new(&mut data).fft();
+    /// ```
+    pub fn fft(&mut self) {
+        while self.state != State::Done {
+            self.fft_iterate();
+        }
+    }
+
     /// Checks if the conversion is complete
     ///
     /// Use this together with the [`EmbFft::fft_iterate()`] function.
     pub fn is_done(&self) -> bool {
         self.state == State::Done
-    }
-}
-
-/******************************************************************************/
-
-macro_rules! gen_fft_iterate {
-    ($self: ident, $T: ty, $N: expr) => {{
-        let sine_table = &SineTable::<$T, $N>::SINE_TABLE;
-        let top;
-        let bottom;
-
-        match $self.state {
-            State::Step1 => {
-                // Twiddle = 1
-                $self.bottom_idx = $self.top_idx + ($self.length << 1);
-                top = $self.data[$self.top_idx];
-                bottom = $self.data[$self.bottom_idx];
-                $self.data[$self.top_idx].0 = bottom.0 + top.0;
-                $self.data[$self.top_idx].1 = bottom.1 + top.1;
-                $self.data[$self.bottom_idx].0 = top.0 - bottom.0;
-                $self.data[$self.bottom_idx].1 = top.1 - bottom.1;
-                $self.top_idx += 1;
-                $self.bottom_idx += 1;
-                $self.step = $self.step_size;
-                if $self.step_size < $N / 4 {
-                    $self.state = State::Step2;
-                } else {
-                    $self.state = State::Step3;
-                }
-            },
-
-            State::Step2 => {
-                // Twiddle = e^(-j * theta)
-                top = $self.data[$self.top_idx];
-                bottom = $self.data[$self.bottom_idx];
-                let temp = (top.0 - bottom.0, top.1 - bottom.1);
-                $self.data[$self.top_idx].0 = bottom.0 + top.0;
-                $self.data[$self.top_idx].1 = bottom.1 + top.1;
-                $self.data[$self.bottom_idx].0 = temp.0 * sine_table[$N / 4 - $self.step] + temp.1 * sine_table[$self.step];
-                $self.data[$self.bottom_idx].1 = temp.1 * sine_table[$N / 4 - $self.step] - temp.0 * sine_table[$self.step];
-                $self.top_idx += 1;
-                $self.bottom_idx += 1;
-                if $self.step < $N / 4 - $self.step_size {
-                    $self.step += $self.step_size;
-                } else {
-                    $self.state = State::Step3;
-                }
-            },
-
-            State::Step3 => {
-                // Twiddle = -j
-                top = $self.data[$self.top_idx];
-                bottom = $self.data[$self.bottom_idx];
-                $self.data[$self.top_idx].0 = bottom.0 + top.0;
-                $self.data[$self.top_idx].1 = bottom.1 + top.1;
-                $self.data[$self.bottom_idx].0 = top.1 - bottom.1;
-                $self.data[$self.bottom_idx].1 = bottom.0 - top.0;
-                $self.top_idx += 1;
-                $self.bottom_idx += 1;
-                $self.step = $self.step_size;
-                if $self.step_size < $N / 4 {
-                    $self.state = State::Step4;
-                } else {
-                    $self.state = State::Step5;
-                }
-            },
-
-            State::Step4 => {
-                // Twiddle = -j * e^(-j * theta)
-                top = $self.data[$self.top_idx];
-                bottom = $self.data[$self.bottom_idx];
-                let temp = (top.1 - bottom.1, bottom.0 - top.0);
-                $self.data[$self.top_idx].0 = bottom.0 + top.0;
-                $self.data[$self.top_idx].1 = bottom.1 + top.1;
-                $self.data[$self.bottom_idx].0 = temp.0 * sine_table[$N / 4 - $self.step] + temp.1 * sine_table[$self.step];
-                $self.data[$self.bottom_idx].1 = temp.1 * sine_table[$N / 4 - $self.step] - temp.0 * sine_table[$self.step];
-                $self.top_idx += 1;
-                $self.bottom_idx += 1;
-                if $self.step < $N / 4 - $self.step_size {
-                    $self.step += $self.step_size;
-                } else {
-                    $self.state = State::Step5;
-                }
-            },
-
-            State::Step5 => {
-                // Check if we need to loop
-                if $self.bottom_idx < $N {
-                    $self.top_idx = $self.bottom_idx;
-                    $self.state = State::Step1;
-                } else if $self.length > 1 {
-                    $self.length >>= 1;
-                    $self.step_size <<= 1;
-                    $self.top_idx = 0;
-                    $self.state = State::Step1;
-                } else {
-                    $self.top_idx = 0;
-                    $self.bottom_idx = 1;
-                    $self.state = State::Step6;
-                }
-            },
-
-            State::Step6 => {
-                // Twiddle = 1
-                top = $self.data[$self.top_idx];
-                bottom = $self.data[$self.bottom_idx];
-                $self.data[$self.top_idx].0 = bottom.0 + top.0;
-                $self.data[$self.top_idx].1 = bottom.1 + top.1;
-                $self.data[$self.bottom_idx].0 = top.0 - bottom.0;
-                $self.data[$self.bottom_idx].1 = top.1 - bottom.1;
-                if $self.bottom_idx < $N - 2 {
-                    $self.top_idx += 2;
-                    $self.bottom_idx += 2;
-                } else {
-                    $self.top_idx = 0;
-                    $self.bottom_idx = 0;
-                    $self.state = State::Reorder;
-                }
-            },
-
-            State::Reorder => {
-                // Ensure the output order is the same as the input
-                top = $self.data[$self.top_idx];
-                bottom = $self.data[$self.bottom_idx];
-                if $self.bottom_idx > $self.top_idx {
-                    $self.data[$self.top_idx] = bottom;
-                    $self.data[$self.bottom_idx] = top;
-                }
-                if $self.top_idx < $N - 1 {
-                    $self.bottom_idx = Base::<$N>::reverse_bits($self.top_idx + 1);
-                    $self.top_idx += 1;
-                } else {
-                    $self.state = State::Done;
-                }
-            },
-
-            State::Done => {}
-        }
-    }};
-}
-
-/******************************************************************************/
-
-impl<const N: usize> EmbFft<'_, f32, N> {
-    /// Non-blocking FFT computation with f32 precision
-    ///
-    /// Use this together with the [`EmbFft::is_done()`] function.
-    /// For example:
-    /// ```
-    /// let mut data = [
-    ///     (1.0f32, 1.0), (2.0, 2.0),
-    ///     (3.0f32, 3.0), (4.0, 4.0),
-    ///     (5.0f32, 5.0), (6.0, 6.0),
-    ///     (7.0f32, 7.0), (8.0, 8.0)
-    /// ];
-    ///
-    /// let mut fft = embfft::EmbFft::new(&mut data);
-    /// while !fft.is_done() {
-    ///     fft.fft_iterate();
-    ///     // Other actions can be performed here between two iterations
-    /// }
-    /// ```
-    pub fn fft_iterate(&mut self) {
-        gen_fft_iterate!(self, f32, N);
-    }
-
-    /// Blocking FFT computation with f32 precision
-    ///
-    /// For example:
-    /// ```
-    /// let mut data = [
-    ///     (1.0f32, 1.0), (2.0, 2.0),
-    ///     (3.0f32, 3.0), (4.0, 4.0),
-    ///     (5.0f32, 5.0), (6.0, 6.0),
-    ///     (7.0f32, 7.0), (8.0, 8.0)
-    /// ];
-    /// embfft::EmbFft::new(&mut data).fft();
-    /// ```
-    pub fn fft(&mut self) {
-        while self.state != State::Done {
-            gen_fft_iterate!(self, f32, N);
-        }
-    }
-}
-
-impl<const N: usize> EmbFft<'_, f64, N> {
-    /// Non-blocking FFT computation with f64 precision
-    ///
-    /// Use this together with the [`EmbFft::is_done()`] function.
-    /// For example:
-    /// ```
-    /// let mut data = [
-    ///     (1.0f64, 1.0), (2.0, 2.0),
-    ///     (3.0f64, 3.0), (4.0, 4.0),
-    ///     (5.0f64, 5.0), (6.0, 6.0),
-    ///     (7.0f64, 7.0), (8.0, 8.0)
-    /// ];
-    ///
-    /// let mut fft = embfft::EmbFft::new(&mut data);
-    /// while !fft.is_done() {
-    ///     fft.fft_iterate();
-    ///     // Other actions can be performed here between two iterations
-    /// }
-    /// ```
-    pub fn fft_iterate(&mut self) {
-        gen_fft_iterate!(self, f64, N);
-    }
-
-    /// Blocking FFT computation with f64 precision
-    ///
-    /// For example:
-    /// ```
-    /// let mut data = [
-    ///     (1.0f64, 1.0), (2.0, 2.0),
-    ///     (3.0f64, 3.0), (4.0, 4.0),
-    ///     (5.0f64, 5.0), (6.0, 6.0),
-    ///     (7.0f64, 7.0), (8.0, 8.0)
-    /// ];
-    /// embfft::EmbFft::new(&mut data).fft();
-    /// ```
-    pub fn fft(&mut self) {
-        while self.state != State::Done {
-            gen_fft_iterate!(self, f64, N);
-        }
     }
 }
 

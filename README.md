@@ -70,7 +70,8 @@ Thanks to Robert Bristow-Johnson for the explanation of the algorithm, as well a
 
 ## Changelog
 
-| Date       | Version | Changes         |
-|------------|---------|-----------------|
-| 2025-04-05 | 0.1.0   | Initial release |
-| 2025-04-06 | 0.2.0   | Add IFFT        |
+| Date       | Version | Changes                                  |
+|------------|---------|------------------------------------------|
+| 2025-04-09 | 0.2.1   | Code cleanup and performance improvement |
+| 2025-04-06 | 0.2.0   | Add inverse FFT                          |
+| 2025-04-05 | 0.1.0   | Initial release                          |

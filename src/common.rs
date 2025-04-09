@@ -5,6 +5,10 @@
 
 /******************************************************************************/
 
+use core::ops::{Add, Mul, Neg, Sub};
+
+/******************************************************************************/
+
 pub struct Base<const N: usize>;
 
 impl<const N: usize> Base<N> {
@@ -48,26 +52,34 @@ impl<const N: usize> Base<N> {
 
 /******************************************************************************/
 
-pub struct SineTable<T, const N: usize>(T);
+/// A trait that allows generic implementations for float types
+pub trait Float<const N: usize>:
+    Copy + Add<Output = Self> + Mul<Output = Self> + Neg<Output = Self> + Sub<Output = Self>
+{
+    const ZERO: Self;
+    const N_INV: Self;
+    const SINE_TABLE: [Self; N];
+}
 
-macro_rules! gen_sine_table {
-    ($type: ty) => {{
-        // TODO: the size should be N / 4...
-        let mut table = [0.0; N];
-        let mut i = 1;
-        while i < N / 4 {
-            table[i] =
-                crate::cordic::sin(2.0 * core::f64::consts::PI * i as f64 / N as f64) as $type;
-            i += 1;
+macro_rules! gen_float_impl {
+    ($T: ty) => {
+        impl<const N: usize> Float<N> for $T {
+            const ZERO: Self = 0.0;
+            const N_INV: Self = 1.0 / N as $T;
+            const SINE_TABLE: [Self; N] = {
+                // TODO: the size should be N / 4...
+                let mut table = [0.0; N];
+                let mut i = 1;
+                while i < N / 4 {
+                    table[i] =
+                        crate::cordic::sin(2.0 * core::f64::consts::PI * i as f64 / N as f64) as $T;
+                    i += 1;
+                }
+                table
+            };
         }
-        table
-    }};
+    };
 }
 
-impl<const N: usize> SineTable<f32, N> {
-    pub const SINE_TABLE: [f32; N] = { gen_sine_table!(f32) };
-}
-
-impl<const N: usize> SineTable<f64, N> {
-    pub const SINE_TABLE: [f64; N] = { gen_sine_table!(f64) };
-}
+gen_float_impl!(f32);
+gen_float_impl!(f64);
